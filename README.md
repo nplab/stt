@@ -1,5 +1,4 @@
 # stt
-SCTP testtool
 This is a extended version of [guile](https://www.gnu.org/software/guile/) to add basic support for
 handling arbitrary SCTP packets.
 
