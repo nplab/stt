@@ -1,0 +1,13 @@
+#! /bin/sh
+set -x
+if [ -e /usr/local/share/aclocal ] && [ -e /usr/share/aclocal ]; then
+   aclocal -I /usr/local/share/aclocal -I /usr/share/aclocal
+elif [ -e /usr/local/share/aclocal ]; then
+   aclocal -I /usr/local/share/aclocal
+elif [ -e /usr/share/aclocal ]; then
+   aclocal -I /usr/share/aclocal
+else
+   aclocal
+fi
+autoconf
+automake --gnu --add-missing --copy
