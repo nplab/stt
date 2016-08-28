@@ -55,6 +55,7 @@ Makefile
 /config.log
 /config.status
 /config.sub
+/.deps/
 /runsctptest
 /stt
 
