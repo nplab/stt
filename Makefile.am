@@ -19,5 +19,5 @@ install-exec-hook:
 	@if test ! -d "$(prefix)/share/stt"; then \
   	  mkdir $(prefix)/share/stt; \
 	fi
-	cp $(srcdir)/init.scm /usr/local/share/stt/init.scm
+	cp $(srcdir)/init.scm $(prefix)/share/stt/init.scm
 
