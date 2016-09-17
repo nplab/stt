@@ -1,4 +1,4 @@
-AC_INIT(stt, 0.9.9f)
+AC_INIT(stt, 0.9.9g)
 AC_CONFIG_SRCDIR(testtool.c)
 AM_INIT_AUTOMAKE
 AC_PROG_CC
