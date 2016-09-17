@@ -12,7 +12,7 @@ stt_SOURCES  = addresses.h addresses.c \
                testtool.c
 stt_LDADD    = $(GUILE_LDFLAGS)
 stt_CFLAGS   = $(GUILE_CFLAGS)
-EXTRA_DIST   = TODO init.scm quickref.txt
+EXTRA_DIST   = init.scm quickref.txt
 install-exec-hook:
 	chown root $(bindir)/stt
 	chmod u+s $(bindir)/stt
