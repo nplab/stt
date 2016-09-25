@@ -96,7 +96,11 @@ main(int argc, char *argv[]) {
 	}
 
 	if ((pid = fork()) == 0) {
+#if defined(__APPLE__) || defined(__FreeBSD__)
 		execlp("/usr/local/bin/stt", "stt", "-c", command, NULL);
+#else
+		execlp("/usr/bin/stt", "stt", "-c", command, NULL);
+#endif
 		return (255);
 	}
 	printf("Test %-40.40s ", argv[optind]);
