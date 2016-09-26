@@ -660,7 +660,11 @@ register_send_receive(void)
 }
 
 
+#if defined(__APPLE__) || defined(__FreeBSD__)
 #define SYSTEMCONFIGFILENAME    "/usr/local/share/stt/init.scm"
+#else
+#define SYSTEMCONFIGFILENAME    "/usr/share/stt/init.scm"
+#endif
 #define USERCONFIGFILENAME      ".stt.scm"
 #define DIRECTORYSEPARATOR      "/"
 
