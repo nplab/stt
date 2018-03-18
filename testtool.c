@@ -41,6 +41,9 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/stat.h>
+#if defined(__FreeBSD__)
+#include <osreldate.h>
+#endif
 
 #include "common.h"
 #include "parameter.h"
@@ -178,7 +181,11 @@ sctp_send_iov(struct iovec iov[],
 		ip_header.ip_v     = IPVERSION;
 		ip_header.ip_hl    = sizeof(ip_header) >> 2;
 		ip_header.ip_tos   = TOS;
+#if defined(__FreeBSD__) && (__FreeBSD_version >= 1100030)
+		ip_header.ip_len   = htons(length + sizeof(ip_header));
+#else
 		ip_header.ip_len   = length + sizeof(ip_header);
+#endif
 		ip_header.ip_id    = 0;
 		ip_header.ip_off   = 0;
 		ip_header.ip_ttl   = IPDEFTTL;
