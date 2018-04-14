@@ -171,7 +171,7 @@ make_ipv4_address_parameter(SCM address_smob)
 	scm_assert_smob_type(address_tag, address_smob);
 	addr = (struct sockaddr_in *) SCM_SMOB_DATA (address_smob);
 	if (addr->sin_family != AF_INET) {
-		/* FIME */
+		/* FIXME */
 		scm_syserror_msg ("make-ipv4-address-parameter", "incorrect address type", address_smob, 0);
 	}
 	parameter = (struct ipv4_address_parameter *)scm_gc_malloc(IPV4_ADDRESS_PARAMETER_LENGTH, "parameter");
