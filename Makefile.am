@@ -10,7 +10,7 @@ stt_SOURCES  = addresses.h addresses.c \
                tlv.h tlv.c \
                common.h \
                testtool.c
-stt_LDADD    = $(GUILE_LDFLAGS)
+stt_LDADD    = $(GUILE_LIBS)
 stt_CFLAGS   = $(GUILE_CFLAGS)
 EXTRA_DIST   = init.scm quickref.txt
 install-exec-hook:

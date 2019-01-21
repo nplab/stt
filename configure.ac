@@ -32,6 +32,6 @@ AC_CHECK_MEMBER(struct sockaddr_in6.sin6_len,
                  #endif
                  #include <netinet/in.h>])
 
-GUILE_PROGS
-GUILE_FLAGS
+PKG_CHECK_MODULES([GUILE], [guile-2.0])
+
 AC_OUTPUT(Makefile)
