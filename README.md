@@ -6,7 +6,7 @@ handling arbitrary SCTP packets.
 ### Linux (Ubuntu)
 For installing the required packages run:
 ```
-sudo apt-get install guile-2.0 guile-2.0-dev
+sudo apt-get install guile-2.2 guile-2.2-dev
 ```
 Then download the sources, compile them and install the files:
 ```
