@@ -242,7 +242,7 @@ make_data_chunk(SCM s_tsn, SCM s_sid, SCM s_ssn, SCM s_ppi, SCM s_user_data, SCM
 	data_chunk->ssn = htons(ssn);
 	data_chunk->ppi = htonl(ppi);
 
-	for(i = 0; i < user_data_length; i++) {
+	for (i = 0; i < user_data_length; i++) {
 		data_chunk->user_data[i] = scm_to_uint8(SCM_SIMPLE_VECTOR_REF(s_user_data, i));
 	}
 
@@ -307,7 +307,7 @@ make_ndata_chunk(SCM s_tsn, SCM s_sid, SCM s_ssn, SCM s_ppi, SCM s_mid, SCM s_fs
 	ndata_chunk->mid = htonl(mid);
 	ndata_chunk->fsn = htonl(fsn);
 
-	for(i = 0; i < user_data_length; i++) {
+	for (i = 0; i < user_data_length; i++) {
 		ndata_chunk->user_data[i] = scm_to_uint8(SCM_SIMPLE_VECTOR_REF(s_user_data, i));
 	}
 
@@ -451,7 +451,7 @@ get_user_data(SCM chunk_smob)
 		length = ntohs(data_chunk->length) - NDATA_CHUNK_HEADER_LENGTH;
 	}
 	s_user_data = scm_c_make_vector(length, SCM_UNSPECIFIED);
-	for(i = 0; i < length; i++) {
+	for (i = 0; i < length; i++) {
 		SCM_SIMPLE_VECTOR_SET(s_user_data, i, scm_from_uint8(data_chunk->user_data[i]));
 	}
 
@@ -551,7 +551,7 @@ make_init_chunk(SCM s_init_tag, SCM s_a_rwnd, SCM s_MOS, SCM s_MIS, SCM s_init_T
 
 	parameter_length = 0;
 	number_of_parameters = scm_c_vector_length(s_parameters);
-	for(parameter_number = 0; parameter_number < number_of_parameters; parameter_number++) {
+	for (parameter_number = 0; parameter_number < number_of_parameters; parameter_number++) {
 		if (parameter_number > 0) {
 			chunk_length += ADD_PADDING(parameter_length);
 		}
@@ -577,7 +577,7 @@ make_init_chunk(SCM s_init_tag, SCM s_a_rwnd, SCM s_MOS, SCM s_MIS, SCM s_init_T
 	init_chunk->initial_tsn = htonl(initial_tsn);
 
 	offset = 0;
-	for(parameter_number = 0; parameter_number < number_of_parameters; parameter_number++) {
+	for (parameter_number = 0; parameter_number < number_of_parameters; parameter_number++) {
 		s_parameter = SCM_SIMPLE_VECTOR_REF(s_parameters, parameter_number);
 		length = ADD_PADDING(ntohs(((struct parameter *) SCM_SMOB_DATA (s_parameter))->length));
 		memcpy((void *)(init_chunk->parameter + offset), (const void *)(SCM_SMOB_DATA (s_parameter)), length);
@@ -608,7 +608,7 @@ make_init_ack_chunk(SCM s_init_tag, SCM s_a_rwnd, SCM s_MOS, SCM s_MIS, SCM s_in
 
 	parameter_length = 0;
 	number_of_parameters = scm_c_vector_length(s_parameters);
-	for(parameter_number = 0; parameter_number < number_of_parameters; parameter_number++) {
+	for (parameter_number = 0; parameter_number < number_of_parameters; parameter_number++) {
 		if (parameter_number > 0) {
 			chunk_length += ADD_PADDING(parameter_length);
 		}
@@ -634,7 +634,7 @@ make_init_ack_chunk(SCM s_init_tag, SCM s_a_rwnd, SCM s_MOS, SCM s_MIS, SCM s_in
 	init_ack_chunk->initial_tsn = htonl(initial_tsn);
 
 	offset = 0;
-	for(parameter_number = 0; parameter_number < number_of_parameters; parameter_number++) {
+	for (parameter_number = 0; parameter_number < number_of_parameters; parameter_number++) {
 		s_parameter = SCM_SIMPLE_VECTOR_REF(s_parameters, parameter_number);
 		length = ADD_PADDING(ntohs(((struct parameter *)SCM_SMOB_DATA(s_parameter))->length));
 		memcpy((void *)(init_ack_chunk->parameter + offset), (const void *)(SCM_SMOB_DATA(s_parameter)), length);
@@ -798,7 +798,7 @@ make_sack_chunk(SCM s_cum_tsn_ack, SCM s_a_rwnd, SCM s_gaps, SCM s_dup_tsns, SCM
 	sack_chunk->nr_of_dups = htons(nr_of_dups);
 
 	offset = 0;
-	for(i = 0; i < scm_c_vector_length(s_gaps); i++) {
+	for (i = 0; i < scm_c_vector_length(s_gaps); i++) {
 		s_block = SCM_SIMPLE_VECTOR_REF(s_gaps, i);
 		SCM_ASSERT(scm_is_vector(s_block), s_block, SCM_ARGn, "make-sack-chunk");
 		if (scm_c_vector_length(s_block) != 2) {
@@ -812,7 +812,7 @@ make_sack_chunk(SCM s_cum_tsn_ack, SCM s_a_rwnd, SCM s_gaps, SCM s_dup_tsns, SCM
 		offset += 2;
 	}
 
-	for(i = 0; i < scm_c_vector_length(s_dup_tsns); i++) {
+	for (i = 0; i < scm_c_vector_length(s_dup_tsns); i++) {
 		dup   = htonl(scm_to_uint32(SCM_SIMPLE_VECTOR_REF(s_dup_tsns, i)));
 		memcpy((void *)(sack_chunk->tsns + offset), (const void *)&dup, 4);
 		offset += 4;
@@ -867,7 +867,7 @@ make_nr_sack_chunk(SCM s_cum_tsn_ack, SCM s_a_rwnd, SCM s_gaps, SCM s_nr_gaps, S
 	nr_sack_chunk->nr_of_dups = htons(nr_of_dups);
 
 	offset = 0;
-	for(i = 0; i < scm_c_vector_length(s_gaps); i++) {
+	for (i = 0; i < scm_c_vector_length(s_gaps); i++) {
 		s_block = SCM_SIMPLE_VECTOR_REF(s_gaps, i);
 		SCM_ASSERT(scm_is_vector(s_block), s_block, SCM_ARGn, "make-nr-sack-chunk");
 		if (scm_c_vector_length(s_block) != 2) {
@@ -881,7 +881,7 @@ make_nr_sack_chunk(SCM s_cum_tsn_ack, SCM s_a_rwnd, SCM s_gaps, SCM s_nr_gaps, S
 		offset += 2;
 	}
 
-	for(i = 0; i < scm_c_vector_length(s_nr_gaps); i++) {
+	for (i = 0; i < scm_c_vector_length(s_nr_gaps); i++) {
 		s_block = SCM_SIMPLE_VECTOR_REF(s_nr_gaps, i);
 		SCM_ASSERT(scm_is_vector(s_block), s_block, SCM_ARGn, "make-nr-sack-chunk");
 		if (scm_c_vector_length(s_block) != 2) {
@@ -895,7 +895,7 @@ make_nr_sack_chunk(SCM s_cum_tsn_ack, SCM s_a_rwnd, SCM s_gaps, SCM s_nr_gaps, S
 		offset += 2;
 	}
 
-	for(i = 0; i < scm_c_vector_length(s_dup_tsns); i++) {
+	for (i = 0; i < scm_c_vector_length(s_dup_tsns); i++) {
 		dup   = htonl(scm_to_uint32(SCM_SIMPLE_VECTOR_REF(s_dup_tsns, i)));
 		memcpy((void *)(nr_sack_chunk->tsns + offset), (const void *)&dup, 4);
 		offset += 4;
@@ -1082,7 +1082,7 @@ get_nr_gaps(SCM chunk_smob)
 	offset =  4 * ntohs(nr_sack_chunk->nr_of_gaps);
 
 	s_gaps = scm_c_make_vector(length, SCM_UNSPECIFIED);
-	for(i = 0; i < length; i++) {
+	for (i = 0; i < length; i++) {
 		s_block = scm_c_make_vector(2, SCM_UNSPECIFIED);
 		memcpy((void *)&start, (const void *)(nr_sack_chunk->tsns + offset), 2);
 		offset += 2;
@@ -1377,7 +1377,7 @@ make_cookie_echo_chunk(SCM s_state_cookie)
 	cookie_echo_chunk->type = COOKIE_ECHO_CHUNK_TYPE;
 	cookie_echo_chunk->flags  = 0;
 	cookie_echo_chunk->length = htons(cookie_length + 4);
-	for(i = 0; i < scm_c_vector_length(s_state_cookie); i++) {
+	for (i = 0; i < scm_c_vector_length(s_state_cookie); i++) {
 		cookie_echo_chunk->state_cookie[i] = scm_to_uint8(SCM_SIMPLE_VECTOR_REF(s_state_cookie, i));
 	}
 	SCM_RETURN_NEWSMOB(chunk_tag, cookie_echo_chunk);
@@ -1400,7 +1400,7 @@ get_cookie_echo_chunk_cookie(SCM chunk_smob)
 	}
 	length = ntohs(chunk->length) - CHUNK_HEADER_LENGTH;
 	s_cookie = scm_c_make_vector(length, SCM_UNSPECIFIED);
-	for(i = 0; i < length; i++) {
+	for (i = 0; i < length; i++) {
 		SCM_SIMPLE_VECTOR_SET(s_cookie, i, scm_from_uint8(chunk->data[i]));
 	}
 	return s_cookie;
@@ -1517,7 +1517,7 @@ make_forward_tsn_chunk(SCM s_cum_tsn, SCM s_stream_info)
 	forward_tsn_chunk->cum_tsn = htonl(cum_tsn);
 
 	offset = 0;
-	for(i = 0; i < scm_c_vector_length(s_stream_info); i++) {
+	for (i = 0; i < scm_c_vector_length(s_stream_info); i++) {
 		s_info = SCM_SIMPLE_VECTOR_REF(s_stream_info, i);
 		SCM_ASSERT(scm_is_vector(s_info), s_info, SCM_ARGn, "make-forward-tsn-chunk");
 		if (scm_c_vector_length(s_info) != 2) {
@@ -1569,7 +1569,7 @@ get_new_stream_info(SCM chunk_smob)
 	offset = 0;
 
 	s_stream_info = scm_c_make_vector(length, SCM_UNSPECIFIED);
-	for(i=0; i < length; i++) {
+	for (i=0; i < length; i++) {
 		s_info = scm_c_make_vector(2, SCM_UNSPECIFIED);
 		memcpy((void *)&sid, (const void *)(forward_tsn_chunk->stream_info + offset), 2);
 		offset += 2;
@@ -1673,7 +1673,7 @@ make_chunk(SCM s_type, SCM s_flags, SCM s_data)
 	chunk->type = type;
 	chunk->flags  = flags;
 	chunk->length = htons(chunk_length);
-	for(i = 0; i < chunk_data_length; i++) {
+	for (i = 0; i < chunk_data_length; i++) {
 		chunk->data[i] = scm_to_uint8(SCM_SIMPLE_VECTOR_REF(s_data, i));
 	}
 	SCM_RETURN_NEWSMOB(chunk_tag, chunk);
@@ -1825,7 +1825,7 @@ get_chunk_data(SCM chunk_smob)
 		length = ntohs(chunk->length) - CHUNK_HEADER_LENGTH;
 	}
 	s_value = scm_c_make_vector(length, SCM_UNSPECIFIED);
-	for(i = 0; i < length; i++) {
+	for (i = 0; i < length; i++) {
 		SCM_SIMPLE_VECTOR_SET(s_value, i, scm_from_uint8(chunk->data[i]));
 	}
 

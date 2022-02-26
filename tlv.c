@@ -60,7 +60,7 @@ scan_tlv_list(SCM s_tlvs, scm_t_bits tag, scm_t_uint16 max_length)
 
 	number_of_tlvs = SCM_SIMPLE_VECTOR_LENGTH(s_tlvs);
 	total_length = 0;
-	for(tlv_number = 0; tlv_number < number_of_tlvs; tlv_number++) {
+	for (tlv_number = 0; tlv_number < number_of_tlvs; tlv_number++) {
 		s_tlv   = SCM_SIMPLE_VECTOR_REF(s_tlvs, tlv_number);
 		if ((SCM_IMP(s_tlv)) || (SCM_CELL_TYPE (s_tlv) != tag)) {
 			return (max_length + 1);
@@ -85,7 +85,7 @@ put_tlv_list(unsigned char *buffer, SCM s_tlvs)
 	number_of_tlvs = scm_c_vector_length(s_tlvs);
 	offset = 0;
 
-	for(tlv_number = 0; tlv_number < number_of_tlvs; tlv_number++) {
+	for (tlv_number = 0; tlv_number < number_of_tlvs; tlv_number++) {
 		tlv = (struct tlv *)SCM_SMOB_DATA(scm_c_vector_ref(s_tlvs, tlv_number));
 		length  = ADD_PADDING(TLV_LENGTH (tlv));
 		memcpy((void *)buffer + offset, (const void *)tlv, length);
@@ -119,7 +119,7 @@ get_tlv_list(unsigned char *list, scm_t_uint16 length, const char *type_name, sc
 	s_tlvs = scm_c_make_vector(number_of_tlvs, SCM_UNSPECIFIED);
 
 	offset = 0;
-	for(tlv_number = 0; tlv_number < number_of_tlvs; tlv_number++) {
+	for (tlv_number = 0; tlv_number < number_of_tlvs; tlv_number++) {
 		tlv_length = TLV_LENGTH(list + offset);
 		total_length = ADD_PADDING(tlv_length);
 		tlv = (struct tlv *)scm_gc_malloc(total_length, type_name);

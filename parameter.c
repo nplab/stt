@@ -124,7 +124,7 @@ make_tlv_parameter(scm_t_uint16 parameter_type, const char *proc_name, SCM s_val
 	memset((void *) parameter, 0, total_length);
 	parameter->type = htons(parameter_type);
 	parameter->length = htons(parameter_length);  
-	for(i = 0; i < SCM_SIMPLE_VECTOR_LENGTH(s_value); i++) {
+	for (i = 0; i < SCM_SIMPLE_VECTOR_LENGTH(s_value); i++) {
 		parameter->value[i] = scm_to_uint8(SCM_SIMPLE_VECTOR_REF(s_value, i));
 	}
 	SCM_RETURN_NEWSMOB (parameter_tag, parameter);
@@ -284,7 +284,7 @@ get_cookie_parameter_cookie(SCM parameter_smob)
 	}
 	length    = ntohs(parameter->length) - PARAMETER_HEADER_LENGTH;
 	s_cookie  = scm_c_make_vector(length, SCM_UNSPECIFIED);
-	for(i = 0; i < length; i++) {
+	for (i = 0; i < length; i++) {
 		SCM_SIMPLE_VECTOR_SET(s_cookie, i, scm_from_uint8(parameter->value[i]));
 	}
 	return s_cookie;
@@ -428,7 +428,7 @@ make_supported_address_type_parameter(SCM s_types)
 	memset((void *) parameter, 0, total_length);
 	parameter->type = htons(SUPPORTED_ADDRESS_TYPE_PARAMETER_TYPE);
 	parameter->length = htons(parameter_length);  
-	for(i = 0; i < SCM_SIMPLE_VECTOR_LENGTH(s_types); i++) {
+	for (i = 0; i < SCM_SIMPLE_VECTOR_LENGTH(s_types); i++) {
 		parameter->address_type[i] = htons(scm_to_uint16(SCM_SIMPLE_VECTOR_REF(s_types, i)));
 	}
 	SCM_RETURN_NEWSMOB (parameter_tag, parameter);
@@ -452,7 +452,7 @@ get_supported_address_types(SCM parameter_smob)
 	number_of_types = (ntohs(parameter->length) - PARAMETER_HEADER_LENGTH) / 2;
 
 	s_types = scm_c_make_vector(number_of_types, SCM_UNSPECIFIED);
-	for(type_number = 0; type_number < number_of_types; type_number++) {
+	for (type_number = 0; type_number < number_of_types; type_number++) {
 		SCM_SIMPLE_VECTOR_SET(s_types, type_number, scm_from_uint16(ntohs(parameter->address_type[type_number])));
 	}
 	return s_types;
@@ -476,7 +476,7 @@ make_supported_extensions_parameter(SCM s_types)
 	memset((void *) parameter, 0, total_length);
 	parameter->type = htons(SUPPORTED_EXTENSIONS_PARAMETER_TYPE);
 	parameter->length = htons(parameter_length);  
-	for(i = 0; i < SCM_SIMPLE_VECTOR_LENGTH(s_types); i++) {
+	for (i = 0; i < SCM_SIMPLE_VECTOR_LENGTH(s_types); i++) {
 		parameter->chunk_type[i] = scm_to_uint8(SCM_SIMPLE_VECTOR_REF(s_types, i));
 	}
 	SCM_RETURN_NEWSMOB (parameter_tag, parameter);
@@ -500,7 +500,7 @@ get_supported_extensions(SCM parameter_smob)
 	number_of_chunks = ntohs(parameter->length) - PARAMETER_HEADER_LENGTH;
 
 	s_types = scm_c_make_vector(number_of_chunks, SCM_UNSPECIFIED);
-	for(chunk_number = 0; chunk_number < number_of_chunks; chunk_number++) {
+	for (chunk_number = 0; chunk_number < number_of_chunks; chunk_number++) {
 		SCM_SIMPLE_VECTOR_SET(s_types, chunk_number, scm_from_uint8(parameter->chunk_type[chunk_number]));
 	}
 	return s_types;
@@ -819,7 +819,7 @@ get_parameter_value(SCM parameter_smob)
 		parameter_length = (size_t)(ntohs(parameter->length) - PARAMETER_HEADER_LENGTH);
 	}
 	s_value = scm_c_make_vector(parameter_length, SCM_UNSPECIFIED);
-	for(i = 0; i < parameter_length; i++) {
+	for (i = 0; i < parameter_length; i++) {
 		SCM_SIMPLE_VECTOR_SET(s_value, i, scm_from_uint8(parameter->value[i]));
 	}
 

@@ -65,6 +65,7 @@ void
 print_usage() {
 	fprintf(stderr, "%s", usage);
 }
+
 int 
 main(int argc, char *argv[]) {
 	unsigned int timeout;

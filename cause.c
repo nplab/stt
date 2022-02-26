@@ -56,7 +56,7 @@ make_cause (SCM s_code, SCM s_info)
 
 	cause->code   = htons((scm_t_uint16)code);
 	cause->length = htons((scm_t_uint16)cause_length);
-	for(i = 0; i < SCM_SIMPLE_VECTOR_LENGTH(s_info); i++) {
+	for (i = 0; i < SCM_SIMPLE_VECTOR_LENGTH(s_info); i++) {
 		cause->info[i] = scm_to_uint8(SCM_SIMPLE_VECTOR_REF(s_info, i));
 	}
 	SCM_RETURN_NEWSMOB(cause_tag, cause);
@@ -172,7 +172,7 @@ get_cause_info (SCM cause_smob)
 		cause_length = (size_t)(ntohs(cause->length) - CAUSE_HEADER_LENGTH);
 	}
 	s_value = scm_c_make_vector(cause_length, SCM_UNSPECIFIED);
-	for(i = 0; i < cause_length; i++) {
+	for (i = 0; i < cause_length; i++) {
 		SCM_SIMPLE_VECTOR_SET(s_value, i, scm_from_uint8(cause->info[i]));
 	}
 

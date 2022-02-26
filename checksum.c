@@ -116,7 +116,7 @@ update_crc32c(register scm_t_uint32 res, const unsigned char* buf, register scm_
 {
 	register scm_t_uint32 i; 
 
-	for(i = 0; i < len; i++) {
+	for (i = 0; i < len; i++) {
 		CRC32C(res, buf[i]);
 	}
 	return res;
@@ -153,7 +153,7 @@ update_adler32(scm_t_uint32 adler, const unsigned char *buf, scm_t_uint32 len)
 	scm_t_uint32 s2 = (adler >> 16) & 0xffff;
 	scm_t_uint32 n;
 	
-	for(n = 0; n < len; n++) {
+	for (n = 0; n < len; n++) {
 		s1 = (s1 + buf[n]) % BASE;
 		s2 = (s2 + s1) % BASE;
 	}

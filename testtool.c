@@ -162,7 +162,7 @@ sctp_send_iov(struct iovec iov[],
 		scm_t_uint16 length;
 		
 		length = 0;
-		for(i = 0; i < iov_cnt; i++ ) {
+		for (i = 0; i < iov_cnt; i++ ) {
 			length += iov[i].iov_len;
 		}
 #ifdef LINUX
@@ -273,7 +273,7 @@ sctp_send(SCM s_common_header,
 		struct chunk *chunk;
 		size_t i;
 
-		for(i = 0; i < number_of_chunks; i++) {
+		for (i = 0; i < number_of_chunks; i++) {
 			chunk = (struct chunk *)SCM_SMOB_DATA(SCM_SIMPLE_VECTOR_REF(s_chunks, i));
 			iovec[i+2].iov_base = (void *)chunk;
 			iovec[i+2].iov_len = ADD_PADDING(ntohs(chunk->length));
@@ -344,7 +344,7 @@ sctp_send_raw(SCM s_common_header,
 
 	length = SCM_SIMPLE_VECTOR_LENGTH(s_bytes);
 	if (length > (MAX_SCTP_PACKET_LENGTH - COMMON_HEADER_LENGTH)) {
-		return(SCM_BOOL_F);
+		return (SCM_BOOL_F);
 	}
 	
 	for (i = 0; i < length; i++) {
@@ -743,5 +743,5 @@ main(int argc, char *argv[])
 
 	open_sockets();
 	scm_boot_guile (argc, argv, inner_main, 0);
-	return(0);
+	return (0);
 }
