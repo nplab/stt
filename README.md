@@ -10,7 +10,7 @@ sudo apt-get install guile-2.2 guile-2.2-dev
 ```
 Then download the sources, compile them and install the files:
 ```
-wget https://github.com/nplab/stt/releases/download/0.9.9h/stt-0.9.9h.tar.gz
+wget https://github.com/nplab/stt/releases/download/stt-0.9.9h/stt-0.9.9h.tar.gz
 tar xvfz stt-0.9.9h.tar.gz
 cd stt-0.9.9h
 ./configure --prefix=/usr
@@ -24,7 +24,7 @@ sudo pkg install wget guile2
 ```
 Then download the sources, compile them and install the files:
 ```
-wget https://github.com/nplab/stt/releases/download/0.9.9h/stt-0.9.9h.tar.gz
+wget https://github.com/nplab/stt/releases/download/stt-0.9.9h/stt-0.9.9h.tar.gz
 tar xvfz stt-0.9.9h.tar.gz
 cd stt-0.9.9h
 ./configure
