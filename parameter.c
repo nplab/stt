@@ -86,7 +86,7 @@ struct modify_ip_address_parameter {
 struct adaption_layer_indication_parameter {
 	scm_t_uint16 type;
 	scm_t_uint16 length;
-	scm_t_uint16 code_point;
+	scm_t_uint32 code_point;
 }__attribute__((packed));
 
 struct success_indication_parameter {
