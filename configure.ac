@@ -1,4 +1,4 @@
-AC_INIT(stt, 0.9.9h)
+AC_INIT([stt],[0.9.9h])
 AC_CONFIG_SRCDIR(testtool.c)
 AM_INIT_AUTOMAKE
 AC_PROG_CC
@@ -34,4 +34,5 @@ AC_CHECK_MEMBER(struct sockaddr_in6.sin6_len,
 
 PKG_CHECK_MODULES([GUILE], [guile-2.2])
 
-AC_OUTPUT(Makefile)
+AC_CONFIG_FILES([Makefile])
+AC_OUTPUT
