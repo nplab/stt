@@ -2,7 +2,7 @@
  *
  * SCTP test tool stt.
  *
- * Copyright (C) 2002-2008 by Michael Tuexen
+ * Copyright (C) 2002-2023 by Michael Tuexen
  *
  * Realized in co-operation between Siemens AG and the Muenster University of
  * Applied Sciences.
@@ -79,6 +79,8 @@ static unsigned char packet[IP_MAXPACKET];
 static struct iovec iovec[IOV_MAX];
 static int sctpv4_fd = -1;
 static int sctpv6_fd = -1;
+static int udpv4_fd = -1;
+static int udpv6_fd = -1;
 static struct sockaddr_in address_any_v4;
 static struct sockaddr_in6 address_any_v6;
 
@@ -134,31 +136,47 @@ static SCM
 sctp_send_iov(struct iovec iov[],
               uint16_t iov_cnt,
               struct sockaddr *to_address,
+              scm_t_uint16 remote_encaps_port,
               struct sockaddr *from_address,
               scm_t_uint16 checksum_algo)
 {
-	scm_t_uint32 checksum, adler32, crc32c;
-	scm_t_int32 is_ipv4;
-	scm_t_uint16 i;
 	struct msghdr msg;
 #ifdef LINUX
 	struct iphdr ip_header;
 #else
 	struct ip ip_header;
 #endif 
+	ssize_t n;
+	scm_t_uint32 checksum, adler32, crc32c;
+	scm_t_int32 is_ipv4;
+	int fd;
+	scm_t_uint16 i;
 
 	is_ipv4 = (to_address->sa_family == AF_INET);
 	if (is_ipv4) {
-		if (sctpv4_fd < 0) {
-			return SCM_BOOL_F;
+		if (remote_encaps_port > 0) {
+			fd = udpv4_fd;
+		} else {
+			fd = sctpv4_fd;
 		}
 	} else {
-		if (sctpv6_fd < 0) {
-			return SCM_BOOL_F;
+		if (remote_encaps_port > 0) {
+			fd = udpv6_fd;
+		} else {
+			fd = sctpv6_fd;
 		}
 	}
-
-	if (is_ipv4) {
+	if (fd < 0) {
+		return SCM_BOOL_F;
+	}
+	if (remote_encaps_port > 0) {
+		if (is_ipv4) {
+			((struct sockaddr_in *)to_address)->sin_port = htons(remote_encaps_port);
+		} else {
+			((struct sockaddr_in6 *)to_address)->sin6_port = htons(remote_encaps_port);
+		}
+	}
+	if (is_ipv4 && (remote_encaps_port == 0)) {
 		scm_t_uint16 length;
 		
 		length = 0;
@@ -205,33 +223,40 @@ sctp_send_iov(struct iovec iov[],
 	((struct common_header *)(iov[1].iov_base))->checksum = htonl(sctp_checksum(iov, iov_cnt, checksum_algo));
 
 	msg.msg_name       = (void *)to_address;
-	msg.msg_namelen    = (is_ipv4)?sizeof(struct sockaddr_in):sizeof(struct sockaddr_in6);
+	msg.msg_namelen    = is_ipv4?sizeof(struct sockaddr_in):sizeof(struct sockaddr_in6);
 	msg.msg_iov        = iov;
 	msg.msg_iovlen     = iov_cnt;
 	msg.msg_control    = NULL;
 	msg.msg_controllen = 0;
 	msg.msg_flags      = 0;
-	if (sendmsg((is_ipv4)?sctpv4_fd:sctpv6_fd, (const struct msghdr *)&msg, 0) < 0) {
-		return SCM_BOOL_F;
-	} else {
-		return SCM_BOOL_T;
+	n = sendmsg(fd, (const struct msghdr *)&msg, 0);
+	if (remote_encaps_port > 0) {
+		if (is_ipv4) {
+			((struct sockaddr_in *)to_address)->sin_port = htons(0);
+		} else {
+			((struct sockaddr_in6 *)to_address)->sin6_port = htons(0);
+		}
 	}
+	return ((n < 0) ? SCM_BOOL_F : SCM_BOOL_T);
 }
 
 static SCM
 sctp_send(SCM s_common_header,
           SCM s_chunks,
           SCM s_to_address,
+          SCM s_remote_encaps_port,
           SCM s_from_address,
           scm_t_uint16 checksum_algo,
           const char *name)
 {
-	size_t length, number_of_chunks;
 	struct sockaddr *to_address, *from_address;
+	size_t length, number_of_chunks;
+	scm_t_uint16 remote_encaps_port;
 
 	scm_assert_smob_type(common_header_tag, s_common_header);
 	SCM_ASSERT(scm_is_simple_vector(s_chunks), s_chunks, SCM_ARG2, name);
 	scm_assert_smob_type(address_tag, s_to_address);
+	remote_encaps_port = scm_to_uint16(s_remote_encaps_port);
 	if (!(SCM_UNBNDP(s_from_address))) {
 		scm_assert_smob_type(address_tag, s_from_address);
 	}
@@ -279,48 +304,50 @@ sctp_send(SCM s_common_header,
 			iovec[i+2].iov_len = ADD_PADDING(ntohs(chunk->length));
 		}
 	}
-	return sctp_send_iov(iovec, 2 + number_of_chunks, to_address, from_address, checksum_algo);
+	return sctp_send_iov(iovec, 2 + number_of_chunks, to_address, remote_encaps_port, from_address, checksum_algo);
 }
 
 static SCM
-sctp_send_with_crc32c(SCM s_common_header, SCM s_chunks, SCM s_to_address, SCM s_from_address)
+sctp_send_with_crc32c(SCM s_common_header, SCM s_chunks, SCM s_to_address, SCM s_remote_encaps_port, SCM s_from_address)
 {
-
-	return sctp_send(s_common_header, s_chunks, s_to_address, s_from_address, CHECKSUM_CRC32C, "sctp-send-with-crc32c");
+	return sctp_send(s_common_header, s_chunks, s_to_address, s_remote_encaps_port, s_from_address, CHECKSUM_CRC32C, "sctp-send-with-crc32c");
 }
 
 static SCM
-sctp_send_with_adler32(SCM s_common_header, SCM s_chunks, SCM s_to_address, SCM s_from_address)
+sctp_send_with_adler32(SCM s_common_header, SCM s_chunks, SCM s_to_address, SCM s_remote_encaps_port, SCM s_from_address)
 {
-	return sctp_send(s_common_header, s_chunks, s_to_address, s_from_address, CHECKSUM_ADLER32, "sctp-send-with-adler32");
+	return sctp_send(s_common_header, s_chunks, s_to_address, s_remote_encaps_port, s_from_address, CHECKSUM_ADLER32, "sctp-send-with-adler32");
 }
 
 static SCM
-sctp_send_with_zero(SCM s_common_header, SCM s_chunks, SCM s_to_address, SCM s_from_address)
+sctp_send_with_zero(SCM s_common_header, SCM s_chunks, SCM s_to_address, SCM s_remote_encaps_port, SCM s_from_address)
 {
-	return sctp_send(s_common_header, s_chunks, s_to_address, s_from_address, CHECKSUM_ZERO, "sctp-send-with-zero");
+	return sctp_send(s_common_header, s_chunks, s_to_address, s_remote_encaps_port, s_from_address, CHECKSUM_ZERO, "sctp-send-with-zero");
 }
 
 static SCM
-sctp_send_with_wrong(SCM s_common_header, SCM s_chunks, SCM s_to_address, SCM s_from_address)
+sctp_send_with_wrong(SCM s_common_header, SCM s_chunks, SCM s_to_address, SCM s_remote_encaps_port, SCM s_from_address)
 {
-	return sctp_send(s_common_header, s_chunks, s_to_address, s_from_address, CHECKSUM_WRONG, "sctp-send-with-wrong");
+	return sctp_send(s_common_header, s_chunks, s_to_address, s_remote_encaps_port, s_from_address, CHECKSUM_WRONG, "sctp-send-with-wrong");
 }
 
 static SCM
 sctp_send_raw(SCM s_common_header,
               SCM s_bytes,
               SCM s_to_address,
+              SCM s_remote_encaps_port,
               SCM s_from_address,
               scm_t_uint16 checksum_algo,
               const char *name)
 {
-	size_t length, i;
 	struct sockaddr *to_address, *from_address;
+	size_t length, i;
+	scm_t_uint16 remote_encaps_port;
 
 	scm_assert_smob_type(common_header_tag, s_common_header);
 	SCM_ASSERT(scm_is_simple_vector(s_bytes), s_bytes, SCM_ARG2, name);
 	scm_assert_smob_type(address_tag, s_to_address);
+	remote_encaps_port = scm_to_uint16(s_remote_encaps_port);
 	if (!(SCM_UNBNDP(s_from_address))) {
 		scm_assert_smob_type(address_tag, s_from_address);
 	}
@@ -358,37 +385,37 @@ sctp_send_raw(SCM s_common_header,
 	iovec[2].iov_base = (void *)packet;
 	iovec[2].iov_len  = length;
 
-	return sctp_send_iov(iovec, 3, to_address, from_address, checksum_algo);
+	return sctp_send_iov(iovec, 3, to_address, remote_encaps_port, from_address, checksum_algo);
 }
 
 static SCM
-sctp_send_raw_with_crc32c(SCM s_common_header, SCM s_bytes, SCM s_to_address, SCM s_from_address)
+sctp_send_raw_with_crc32c(SCM s_common_header, SCM s_bytes, SCM s_to_address, SCM s_remote_encaps_port, SCM s_from_address)
 {
-	return sctp_send_raw(s_common_header, s_bytes, s_to_address, s_from_address, CHECKSUM_CRC32C, "sctp-send-raw-with-crc32c");
+	return sctp_send_raw(s_common_header, s_bytes, s_to_address, s_remote_encaps_port, s_from_address, CHECKSUM_CRC32C, "sctp-send-raw-with-crc32c");
 }
 
 static SCM
-sctp_send_raw_with_adler32(SCM s_common_header, SCM s_bytes, SCM s_to_address, SCM s_from_address)
+sctp_send_raw_with_adler32(SCM s_common_header, SCM s_bytes, SCM s_to_address, SCM s_remote_encaps_port, SCM s_from_address)
 {
-	return sctp_send_raw(s_common_header, s_bytes, s_to_address, s_from_address, CHECKSUM_ADLER32, "sctp-send-raw-with-adler32");
+	return sctp_send_raw(s_common_header, s_bytes, s_to_address, s_remote_encaps_port, s_from_address, CHECKSUM_ADLER32, "sctp-send-raw-with-adler32");
 }
 
 static SCM
-sctp_send_raw_with_zero(SCM s_common_header, SCM s_bytes, SCM s_to_address, SCM s_from_address)
+sctp_send_raw_with_zero(SCM s_common_header, SCM s_bytes, SCM s_to_address, SCM s_remote_encaps_port, SCM s_from_address)
 {
-	return sctp_send_raw(s_common_header, s_bytes, s_to_address, s_from_address, CHECKSUM_ZERO, "sctp-send-raw-with-zero");
+	return sctp_send_raw(s_common_header, s_bytes, s_to_address, s_remote_encaps_port, s_from_address, CHECKSUM_ZERO, "sctp-send-raw-with-zero");
 }
 
 static SCM
-sctp_send_raw_with_wrong(SCM s_common_header, SCM s_bytes, SCM s_to_address, SCM s_from_address)
+sctp_send_raw_with_wrong(SCM s_common_header, SCM s_bytes, SCM s_to_address, SCM s_remote_encaps_port, SCM s_from_address)
 {
-	return sctp_send_raw(s_common_header, s_bytes, s_to_address, s_from_address, CHECKSUM_WRONG, "sctp-send-raw-with-wrong");
+	return sctp_send_raw(s_common_header, s_bytes, s_to_address, s_remote_encaps_port, s_from_address, CHECKSUM_WRONG, "sctp-send-raw-with-wrong");
 }
 
 static SCM
 sctp_receive_v4()
 {
-	SCM s_source, s_destination, s_header, s_chunks, s_checksum_correct;
+	SCM s_source, s_destination, s_header, s_chunks, s_checksum_correct, s_udp_port;
 	scm_t_int32 ip_packet_length;
 	scm_t_uint16 sctp_packet_length, ip_header_length;
 	scm_t_uint32 save_checksum, checksum;
@@ -402,7 +429,7 @@ sctp_receive_v4()
 	struct sockaddr_in *addr;
 
 	if ((ip_packet_length = recv(sctpv4_fd, packet, sizeof(packet), 0)) < 0) {
-		return scm_list_5(SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F);
+		return scm_list_n(SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_UNDEFINED);
 	}
 
 #ifdef LINUX
@@ -465,13 +492,14 @@ sctp_receive_v4()
 		s_chunks = SCM_BOOL_F;
 		s_checksum_correct = SCM_BOOL_F;
 	}
-	return scm_list_5(s_header, s_chunks, s_destination, s_source, s_checksum_correct);
+	s_udp_port = scm_from_ushort(0);
+	return scm_list_n(s_header, s_chunks, s_destination, s_source, s_checksum_correct, s_udp_port, SCM_UNDEFINED);
 }
 
 static SCM 
 sctp_receive_v6()
 {
-	SCM s_source, s_destination, s_header, s_chunks, s_checksum_correct;
+	SCM s_source, s_destination, s_header, s_chunks, s_checksum_correct, s_udp_port;
 	scm_t_int32 sctp_packet_length;
 	scm_t_uint32 save_checksum, checksum;
 	struct msghdr msg;
@@ -496,7 +524,7 @@ sctp_receive_v6()
 
 	if ((sctp_packet_length = recvmsg(sctpv6_fd, &msg, 0)) < 0) {
 		scm_gc_free(addr, sizeof(struct sockaddr_in6), "address");
-		return scm_list_5(SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F);
+		return scm_list_n(SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_UNDEFINED);
 	}
 	SCM_NEWSMOB(s_source, address_tag, addr);
 	s_destination = SCM_BOOL_F;
@@ -514,6 +542,7 @@ sctp_receive_v6()
 				addr->sin6_port   = 0;
 				memcpy((void *)&addr->sin6_addr, (const void *)&info->ipi6_addr, sizeof(struct in6_addr));
 				SCM_NEWSMOB(s_destination, address_tag, addr);
+				break;
 			}
 		}
 	}
@@ -541,7 +570,162 @@ sctp_receive_v6()
 		s_chunks = SCM_BOOL_F;
 		s_checksum_correct = SCM_BOOL_F;
 	}
-	return scm_list_5(s_header, s_chunks, s_destination, s_source, s_checksum_correct);
+	s_udp_port = scm_from_ushort(0);
+	return scm_list_n(s_header, s_chunks, s_destination, s_source, s_checksum_correct, s_udp_port, SCM_UNDEFINED);
+}
+
+static SCM
+udp_receive_v4()
+{
+	SCM s_source, s_destination, s_header, s_chunks, s_checksum_correct, s_udp_port;
+	scm_t_int32 sctp_packet_length;
+	scm_t_uint32 save_checksum, checksum;
+	struct msghdr msg;
+	struct cmsghdr *cmsg;
+	struct iovec iov[1];
+	char ctlbuf[1000];
+	struct common_header *common_header;
+	struct sockaddr_in *addr;
+
+	addr = (struct sockaddr_in *)scm_gc_malloc(sizeof(struct sockaddr_in), "address");
+	memset((void *) addr, 0, sizeof(struct sockaddr_in));
+	iov[0].iov_base = packet;
+	iov[0].iov_len  = sizeof(packet);
+	msg.msg_name       = addr;
+	msg.msg_namelen    = sizeof(struct sockaddr_in);
+	msg.msg_iov        = iov;
+	msg.msg_iovlen     = 1;
+	msg.msg_control    = ctlbuf;
+	msg.msg_controllen = sizeof(ctlbuf);
+	msg.msg_flags      = 0;
+
+	if ((sctp_packet_length = recvmsg(udpv4_fd, &msg, 0)) < 0) {
+		scm_gc_free(addr, sizeof(struct sockaddr_in), "address");
+		return scm_list_n(SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_UNDEFINED);
+	}
+	SCM_NEWSMOB(s_source, address_tag, addr);
+	s_udp_port = scm_from_ushort(ntohs(addr->sin_port));
+	s_destination = SCM_BOOL_F;
+	if (msg.msg_controllen > 0) {
+		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+			if ((cmsg->cmsg_level == IPPROTO_IP) &&
+			    (cmsg->cmsg_type == IP_RECVDSTADDR)) {
+				addr = (struct sockaddr_in *)scm_gc_malloc(sizeof(struct sockaddr_in), "address");
+				memset((void *)addr, 0, sizeof(struct sockaddr_in));
+#ifdef HAVE_SIN_LEN
+				addr->sin_len    = sizeof(struct sockaddr_in);
+#endif
+				addr->sin_family = AF_INET;
+				addr->sin_port   = 0;
+				memcpy((void *)&addr->sin_addr, (const void *)CMSG_DATA(cmsg), sizeof(struct in_addr));
+				SCM_NEWSMOB(s_destination, address_tag, addr);
+				break;
+			}
+		}
+	}
+
+	if (sctp_packet_length >= COMMON_HEADER_LENGTH) {
+		common_header = (struct common_header *)packet;
+		save_checksum = ntohl(common_header->checksum);
+		common_header->checksum = htonl(0);
+		checksum = initialize_crc32c();
+		checksum = update_crc32c(checksum, packet, sctp_packet_length);
+		checksum = finalize_crc32c(checksum);
+		if (checksum == save_checksum) {
+			s_checksum_correct = SCM_BOOL_T;
+		} else {
+			s_checksum_correct = SCM_BOOL_F;
+		}
+		common_header->checksum = ntohl(save_checksum);
+		common_header = (struct common_header *)scm_gc_malloc(COMMON_HEADER_LENGTH, "common_header");
+		memset((void *) common_header, 0, COMMON_HEADER_LENGTH);
+		memcpy((void *) common_header, (const void *)packet, COMMON_HEADER_LENGTH);
+		SCM_NEWSMOB(s_header, common_header_tag, common_header);
+		s_chunks = get_tlv_list(packet + COMMON_HEADER_LENGTH, sctp_packet_length - COMMON_HEADER_LENGTH, "chunks", chunk_tag);
+	} else {
+		s_header = SCM_BOOL_F;
+		s_chunks = SCM_BOOL_F;
+		s_checksum_correct = SCM_BOOL_F;
+	}
+	return scm_list_n(s_header, s_chunks, s_destination, s_source, s_checksum_correct, s_udp_port, SCM_UNDEFINED);
+}
+
+static SCM
+udp_receive_v6()
+{
+	SCM s_source, s_destination, s_header, s_chunks, s_checksum_correct, s_udp_port;
+	scm_t_int32 sctp_packet_length;
+	scm_t_uint32 save_checksum, checksum;
+	struct msghdr msg;
+	struct cmsghdr *cmsg;
+	struct iovec iov[1];
+	char ctlbuf[1000];
+	struct common_header *common_header;
+	struct sockaddr_in6 *addr;
+	struct in6_pktinfo *info;
+
+	addr = (struct sockaddr_in6 *)scm_gc_malloc(sizeof(struct sockaddr_in6), "address");
+	memset((void *) addr, 0, sizeof(struct sockaddr_in6));
+	iov[0].iov_base = packet;
+	iov[0].iov_len  = sizeof(packet);
+	msg.msg_name       = addr;
+	msg.msg_namelen    = sizeof(struct sockaddr_in6);
+	msg.msg_iov        = iov;
+	msg.msg_iovlen     = 1;
+	msg.msg_control    = ctlbuf;
+	msg.msg_controllen = sizeof(ctlbuf);
+	msg.msg_flags      = 0;
+
+	if ((sctp_packet_length = recvmsg(udpv6_fd, &msg, 0)) < 0) {
+		scm_gc_free(addr, sizeof(struct sockaddr_in6), "address");
+		return scm_list_n(SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_UNDEFINED);
+	}
+	SCM_NEWSMOB(s_source, address_tag, addr);
+	s_udp_port = scm_from_ushort(ntohs(addr->sin6_port));
+	s_destination = SCM_BOOL_F;
+	if (msg.msg_controllen > 0) {
+		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+			if ((cmsg->cmsg_level == IPPROTO_IPV6) &&
+			    (cmsg->cmsg_type == IPV6_PKTINFO)) {
+				info = (struct in6_pktinfo *)CMSG_DATA(cmsg);
+				addr = (struct sockaddr_in6 *)scm_gc_malloc(sizeof(struct sockaddr_in6), "address");
+				memset((void *)addr, 0, sizeof(struct sockaddr_in6));
+#ifdef HAVE_SIN6_LEN
+				addr->sin6_len    = sizeof(struct sockaddr_in6);
+#endif
+				addr->sin6_family = AF_INET6;
+				addr->sin6_port   = 0;
+				memcpy((void *)&addr->sin6_addr, (const void *)&info->ipi6_addr, sizeof(struct in6_addr));
+				SCM_NEWSMOB(s_destination, address_tag, addr);
+				break;
+			}
+		}
+	}
+
+	if (sctp_packet_length >= COMMON_HEADER_LENGTH) {
+		common_header = (struct common_header *)packet;
+		save_checksum = ntohl(common_header->checksum);
+		common_header->checksum = htonl(0);
+		checksum = initialize_crc32c();
+		checksum = update_crc32c(checksum, packet, sctp_packet_length);
+		checksum = finalize_crc32c(checksum);
+		if (checksum == save_checksum) {
+			s_checksum_correct = SCM_BOOL_T;
+		} else {
+			s_checksum_correct = SCM_BOOL_F;
+		}
+		common_header->checksum = ntohl(save_checksum);
+		common_header = (struct common_header *)scm_gc_malloc(COMMON_HEADER_LENGTH, "common_header");
+		memset((void *) common_header, 0, COMMON_HEADER_LENGTH);
+		memcpy((void *) common_header, (const void *)packet, COMMON_HEADER_LENGTH);
+		SCM_NEWSMOB(s_header, common_header_tag, common_header);
+		s_chunks = get_tlv_list(packet + COMMON_HEADER_LENGTH, sctp_packet_length - COMMON_HEADER_LENGTH, "chunks", chunk_tag);
+	} else {
+		s_header = SCM_BOOL_F;
+		s_chunks = SCM_BOOL_F;
+		s_checksum_correct = SCM_BOOL_F;
+	}
+	return scm_list_n(s_header, s_chunks, s_destination, s_source, s_checksum_correct, s_udp_port, SCM_UNDEFINED);
 }
 
 static SCM 
@@ -562,7 +746,18 @@ sctp_receive(SCM s_ms)
 		timevalptr      = &timeval;
 	}
 
-	maxfd = MAX(sctpv4_fd, sctpv6_fd) + 1;
+	maxfd = sctpv4_fd;
+	if (maxfd < sctpv6_fd) {
+		maxfd = sctpv6_fd;
+	}
+	if (maxfd < udpv4_fd) {
+		maxfd = udpv4_fd;
+	}
+	if (maxfd < udpv6_fd) {
+		maxfd = udpv6_fd;
+	}
+	maxfd += 1;
+
 	FD_ZERO(&rset);
 	if (sctpv4_fd >= 0) {
 		FD_SET(sctpv4_fd, &rset);
@@ -570,22 +765,34 @@ sctp_receive(SCM s_ms)
 	if (sctpv6_fd >= 0) {
 		FD_SET(sctpv6_fd, &rset);
 	}
+	if (udpv4_fd >= 0) {
+		FD_SET(udpv4_fd, &rset);
+	}
+	if (udpv6_fd >= 0) {
+		FD_SET(udpv6_fd, &rset);
+	}
 
 	if (select(maxfd, &rset, NULL, NULL, timevalptr) < 0) {
 		if (errno != EINTR) {
 			perror("select");
 			exit(-1);
 		} else {
-			return scm_list_5(SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F);
+			return scm_list_n(SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_UNDEFINED);
 		}
 	}
-	if (FD_ISSET(sctpv4_fd, &rset)) {
+	if (sctpv4_fd >= 0 && FD_ISSET(sctpv4_fd, &rset)) {
 		return sctp_receive_v4();
 	}
-	if (FD_ISSET(sctpv6_fd, &rset)) {
+	if (sctpv6_fd >= 0 && FD_ISSET(sctpv6_fd, &rset)) {
 		return sctp_receive_v6();
 	}
-	return scm_list_5(SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F);
+	if (udpv4_fd >= 0 && FD_ISSET(udpv4_fd, &rset)) {
+		return udp_receive_v4();
+	}
+	if (udpv6_fd >= 0 && FD_ISSET(udpv6_fd, &rset)) {
+		return udp_receive_v6();
+	}
+	return scm_list_n(SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_UNDEFINED);
 }
 
 static void
@@ -607,63 +814,138 @@ close_sockets()
 			sctpv6_fd = -1;
 		}
 	}
+	if (udpv4_fd >= 0) {
+		if (close(udpv4_fd) < 0) {
+			perror("close");
+			exit(-1);
+		} else {
+			udpv4_fd = -1;
+		}
+	}
+	if (udpv6_fd >= 0) {
+		if (close(udpv6_fd) < 0) {
+			perror("close");
+			exit(-1);
+		} else {
+			udpv6_fd = -1;
+		}
+	}
 }
 
 static void
-open_sockets()
+open_sockets(scm_t_uint16 local_encaps_port)
 {
+	struct sockaddr_in addr4;
+	struct sockaddr_in6 addr6;
+	const int on = 1;
+
 	sctpv4_fd = socket(AF_INET, SOCK_RAW, IPPROTO_SCTP);
 	if (sctpv4_fd >= 0) {
-		const int on = 1;
-
 		if (setsockopt(sctpv4_fd, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on)) < 0) {
-			perror("setsockopt");
-			exit(-1);
+			close(sctpv4_fd);
+			sctpv4_fd = -1;
 		}
 	}
 	sctpv6_fd = socket(AF_INET6, SOCK_RAW, IPPROTO_SCTP);
 	if (sctpv6_fd >= 0) {
-		const int on = 1;
 #if defined(DARWIN)
 		if (setsockopt(sctpv6_fd, IPPROTO_IPV6, IPV6_PKTINFO, &on, sizeof(on)) < 0) {
-			perror("setsockopt");
-			exit(-1);
+			close(sctpv6_fd);
+			sctpv6_fd = -1;
 		}
 #endif
 #if defined(LINUX) || defined(FREEBSD)
 		if (setsockopt(sctpv6_fd, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on, sizeof(on)) < 0) {
-			perror("setsockopt");
-			exit(-1);
+			close(sctpv6_fd);
+			sctpv6_fd = -1;
 		}
 #endif
 	}
-	if ((sctpv4_fd < 0) && (sctpv6_fd < 0)) {
+	if (local_encaps_port > 0) {
+		udpv4_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+		if (udpv4_fd >= 0) {
+			if (setsockopt(udpv4_fd, IPPROTO_IP, IP_RECVDSTADDR, &on, sizeof(on)) < 0) {
+				close(udpv4_fd);
+				udpv4_fd = -1;
+			}
+		}
+		if (udpv4_fd >= 0) {
+			memset((void *)&addr4, 0, sizeof(struct sockaddr_in));
+#ifdef HAVE_SIN_LEN
+			addr4.sin_len         = sizeof(struct sockaddr_in);
+#endif
+			addr4.sin_family      = AF_INET;
+			addr4.sin_port        = htons(local_encaps_port);
+			addr4.sin_addr.s_addr = htonl(INADDR_ANY);
+			if (bind(udpv4_fd, (const struct sockaddr *)&addr4, (socklen_t)(sizeof(struct sockaddr_in))) < 0) {
+				close(udpv4_fd);
+				udpv4_fd = -1;
+			}
+		}
+		udpv6_fd = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
+		if (udpv6_fd >= 0) {
+#if defined(DARWIN)
+			if (setsockopt(udpv6_fd, IPPROTO_IPV6, IPV6_PKTINFO, &on, sizeof(on)) < 0) {
+				close(udpv6_fd);
+				udpv6_fd = -1;
+			}
+#endif
+#if defined(LINUX) || defined(FREEBSD)
+			if (setsockopt(udpv6_fd, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on, sizeof(on)) < 0) {
+				close(udpv6_fd);
+				udpv6_fd = -1;
+			}
+#endif
+		}
+		if (udpv6_fd >= 0) {
+			memset((void *)&addr6, 0, sizeof(struct sockaddr_in6));
+#ifdef HAVE_SIN6_LEN
+			addr6.sin6_len       = sizeof(struct sockaddr_in6);
+#endif
+			addr6.sin6_family    = AF_INET6;
+			addr6.sin6_port      = htons(local_encaps_port);
+			addr6.sin6_flowinfo  = 0;
+			addr6.sin6_addr      = in6addr_any;
+			if (bind(udpv6_fd, (const struct sockaddr *)&addr6, (socklen_t)(sizeof(struct sockaddr_in6))) < 0) {
+				close(udpv6_fd);
+				udpv6_fd = -1;
+			}
+		}
+	}
+	if ((sctpv4_fd < 0) && (sctpv6_fd < 0) && (udpv4_fd < 0) && (udpv6_fd < 0)) {
 		fprintf(stderr, "Can't open any socket.\n");
 		exit(-1);
 	}
 }
 
 static SCM
-sctp_reset ()
+sctp_reset (SCM s_local_encaps_port)
 {
+	scm_t_uint16 local_encaps_port;
+
 	close_sockets();
-	open_sockets();
+	if (SCM_UNBNDP(s_local_encaps_port)) {
+		local_encaps_port = 0;
+	} else {
+		local_encaps_port = scm_to_uint16(s_local_encaps_port);
+	}
+	open_sockets(local_encaps_port);
 	return SCM_BOOL_T;
 }
 
 static void
 register_send_receive(void)
 {
-	scm_c_define_gsubr ("sctp-send-with-crc32c",      3, 1, 0, sctp_send_with_crc32c);
-	scm_c_define_gsubr ("sctp-send-with-adler32",     3, 1, 0, sctp_send_with_adler32);
-	scm_c_define_gsubr ("sctp-send-with-zero",        3, 1, 0, sctp_send_with_zero);
-	scm_c_define_gsubr ("sctp-send-with-wrong",       3, 1, 0, sctp_send_with_wrong);
-	scm_c_define_gsubr ("sctp-send-raw-with-crc32c",  3, 1, 0, sctp_send_raw_with_crc32c);
-	scm_c_define_gsubr ("sctp-send-raw-with-adler32", 3, 1, 0, sctp_send_raw_with_adler32);
-	scm_c_define_gsubr ("sctp-send-raw-with-zero",    3, 1, 0, sctp_send_raw_with_zero);
-	scm_c_define_gsubr ("sctp-send-raw-with-wrong",   3, 1, 0, sctp_send_raw_with_wrong);
-	scm_c_define_gsubr ("sctp-receive",               0, 1, 0, sctp_receive);
-	scm_c_define_gsubr ("sctp-reset",                 0, 0, 0, sctp_reset);
+	scm_c_define_gsubr("sctp-send-with-crc32c",      4, 1, 0, sctp_send_with_crc32c);
+	scm_c_define_gsubr("sctp-send-with-adler32",     4, 1, 0, sctp_send_with_adler32);
+	scm_c_define_gsubr("sctp-send-with-zero",        4, 1, 0, sctp_send_with_zero);
+	scm_c_define_gsubr("sctp-send-with-wrong",       4, 1, 0, sctp_send_with_wrong);
+	scm_c_define_gsubr("sctp-send-raw-with-crc32c",  4, 1, 0, sctp_send_raw_with_crc32c);
+	scm_c_define_gsubr("sctp-send-raw-with-adler32", 4, 1, 0, sctp_send_raw_with_adler32);
+	scm_c_define_gsubr("sctp-send-raw-with-zero",    4, 1, 0, sctp_send_raw_with_zero);
+	scm_c_define_gsubr("sctp-send-raw-with-wrong",   4, 1, 0, sctp_send_raw_with_wrong);
+	scm_c_define_gsubr("sctp-receive",               0, 1, 0, sctp_receive);
+	scm_c_define_gsubr("sctp-reset",                 0, 1, 0, sctp_reset);
 }
 
 
@@ -718,7 +1000,7 @@ inner_main(void *closure, int argc, char **argv)
 	init_causes();
 	read_system_config_file();
 	read_user_config_file();
-	scm_shell (argc, argv);
+	scm_shell(argc, argv);
 }
 
 int
@@ -741,7 +1023,7 @@ main(int argc, char *argv[])
 	address_any_v6.sin6_flowinfo  = 0;
 	address_any_v6.sin6_addr      = in6addr_any;
 
-	open_sockets();
-	scm_boot_guile (argc, argv, inner_main, 0);
+	open_sockets(0);
+	scm_boot_guile(argc, argv, inner_main, 0);
 	return (0);
 }

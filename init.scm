@@ -122,8 +122,11 @@
 (define (forward-tsn-supported-parameter? x)
   (and (parameter? x) (= (get-parameter-type x) #xc000)))
 
-(define sctp-send sctp-send-with-crc32c)
-(define sctp-send-raw sctp-send-raw-with-crc32c)
+(define sctp-remote-udp-encaps-port 0)
+(define (sctp-send common-header chunks to-address . rest)
+  (apply sctp-send-with-crc32c common-header chunks to-address (cons sctp-remote-udp-encaps-port rest)))
+(define (sctp-send-raw common-header bytes to-address . rest)
+  (apply sctp-send-raw-with-crc32c common-header bytes to-address (cons sctp-remote-udp-encaps-port rest)))
 
 (if (string=? (major-version) "1")
     (use-modules (ice-9 syncase)))
