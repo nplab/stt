@@ -434,7 +434,7 @@ sctp_receive_v4()
 
 #ifdef LINUX
 	ip_header          = (struct iphdr *) packet;
-	ip_header_length   = (ip_header->ihl << 2);
+	ip_header_length   = ip_header->ihl << 2;
 #else
 	ip_header          = (struct ip *) packet;
 	ip_header_length   = ip_header->ip_hl << 2;
