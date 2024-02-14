@@ -459,6 +459,18 @@ get_supported_address_types(SCM parameter_smob)
 }
 
 static SCM
+make_ecn_capable_parameter()
+{
+	struct parameter *parameter = (struct parameter *)scm_gc_malloc(ECN_CAPABLE_PARAMETER_LENGTH, "parameter");
+
+	memset((void *) parameter, 0, ECN_CAPABLE_PARAMETER_LENGTH);
+	parameter->type   = htons(ECN_CAPABLE_PARAMETER_TYPE);
+	parameter->length = htons(ECN_CAPABLE_PARAMETER_LENGTH);
+
+	SCM_RETURN_NEWSMOB (parameter_tag, parameter);
+}
+
+static SCM
 make_supported_extensions_parameter(SCM s_types)
 {
 	struct supported_extensions_parameter *parameter;
@@ -504,18 +516,6 @@ get_supported_extensions(SCM parameter_smob)
 		SCM_SIMPLE_VECTOR_SET(s_types, chunk_number, scm_from_uint8(parameter->chunk_type[chunk_number]));
 	}
 	return s_types;
-}
-
-static SCM
-make_ecn_capable_parameter()
-{
-	struct parameter *parameter = (struct parameter *)scm_gc_malloc(ECN_CAPABLE_PARAMETER_LENGTH, "parameter");
-
-	memset((void *) parameter, 0, ECN_CAPABLE_PARAMETER_LENGTH);
-	parameter->type   = htons(ECN_CAPABLE_PARAMETER_TYPE);
-	parameter->length = htons(ECN_CAPABLE_PARAMETER_LENGTH);
-
-	SCM_RETURN_NEWSMOB (parameter_tag, parameter);
 }
 
 static SCM
