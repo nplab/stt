@@ -38,14 +38,15 @@
 #include "common.h"
 #include "tlv.h"
 
-#define IPV4_ADDRESS_PARAMETER_LENGTH          8
-#define IPV6_ADDRESS_PARAMETER_LENGTH          20
-#define ECN_CAPABLE_PARAMETER_LENGTH           4
-#define COOKIE_PRESERVATIVE_PARAMETER_LENGTH   8
-#define ECN_CAPABLE_PARAMETER_LENGTH           4
-#define FORWARD_TSN_SUPPORTED_PARAMETER_LENGTH 4
-#define CORRELATION_ID_LENGTH                  4
-#define CODE_POINT_LENGTH                      4
+#define IPV4_ADDRESS_PARAMETER_LENGTH             8
+#define IPV6_ADDRESS_PARAMETER_LENGTH            20
+#define ECN_CAPABLE_PARAMETER_LENGTH              4
+#define ZERO_CHECKSUM_ACCEPTABLE_PARAMETER_LENGTH 8
+#define COOKIE_PRESERVATIVE_PARAMETER_LENGTH      8
+#define ECN_CAPABLE_PARAMETER_LENGTH              4
+#define FORWARD_TSN_SUPPORTED_PARAMETER_LENGTH    4
+#define CORRELATION_ID_LENGTH                     4
+#define CODE_POINT_LENGTH                         4
 
 extern scm_t_bits address_tag;
 extern scm_t_bits cause_tag;
@@ -100,6 +101,12 @@ struct error_cause_indication_parameter {
 	scm_t_uint16 length;
 	scm_t_uint32 correlation_id;
 	scm_t_uint8 error_causes[0];
+}__attribute__((packed));
+
+struct zero_checksum_acceptable_parameter {
+	scm_t_uint16 type;
+	scm_t_uint16 length;
+	scm_t_uint32 error_detection_method_id;
 }__attribute__((packed));
 
 struct supported_extensions_parameter {
@@ -467,6 +474,21 @@ make_ecn_capable_parameter()
 	parameter->type   = htons(ECN_CAPABLE_PARAMETER_TYPE);
 	parameter->length = htons(ECN_CAPABLE_PARAMETER_LENGTH);
 
+	SCM_RETURN_NEWSMOB (parameter_tag, parameter);
+}
+
+static SCM
+make_zero_checksum_acceptable_parameter(SCM s_error_detection_method_id)
+{
+	struct zero_checksum_acceptable_parameter *parameter;
+	scm_t_uint32 error_detection_method_id;
+
+	error_detection_method_id = scm_to_uint32(s_error_detection_method_id);
+	parameter = (struct zero_checksum_acceptable_parameter *)scm_gc_malloc(ZERO_CHECKSUM_ACCEPTABLE_PARAMETER_LENGTH, "parameter");
+	memset((void *) parameter, 0, ZERO_CHECKSUM_ACCEPTABLE_PARAMETER_LENGTH);
+	parameter->type = htons(ZERO_CHECKSUM_ACCEPTABLE_PARAMETER_TYPE);
+	parameter->length = htons(ZERO_CHECKSUM_ACCEPTABLE_PARAMETER_LENGTH);
+	parameter->error_detection_method_id = htonl(error_detection_method_id);
 	SCM_RETURN_NEWSMOB (parameter_tag, parameter);
 }
 
@@ -931,6 +953,7 @@ init_parameters(void)
 	scm_c_define_gsubr("make-supported-extensions-parameter",      1, 0, 0, make_supported_extensions_parameter);
 	scm_c_define_gsubr("get-supported-extensions",                 1, 0, 0, get_supported_extensions);
 	scm_c_define_gsubr("make-ecn-capable-parameter",               0, 0, 0, make_ecn_capable_parameter);
+	scm_c_define_gsubr("make-zero-checksum-acceptable-parameter",  1, 0, 0, make_zero_checksum_acceptable_parameter);
 	scm_c_define_gsubr("make-forward-tsn-supported-parameter",     0, 0, 0, make_forward_tsn_supported_parameter);
 	scm_c_define_gsubr("make-add-ip-address-parameter",            2, 0, 0, make_add_ip_address_parameter);
 	scm_c_define_gsubr("get-correlation-id",                       1, 0, 0, get_correlation_id);
