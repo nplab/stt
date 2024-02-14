@@ -107,7 +107,7 @@ sctp_checksum(struct iovec iov[],
 			adler32 = update_adler32(adler32, iov[i].iov_base, iov[i].iov_len);
 		}
 		adler32 = finalize_adler32(adler32);
-		checksum = crc32c;
+		checksum = adler32;
 		break;
 	case CHECKSUM_ZERO:
 		checksum = 0;
@@ -413,13 +413,39 @@ sctp_send_raw_with_wrong(SCM s_common_header, SCM s_bytes, SCM s_to_address, SCM
 }
 
 static SCM
-sctp_receive_v4()
+sctp_checksum_correct(unsigned char *sctp_packet, scm_t_uint32 sctp_packet_length, scm_t_uint16 checksum_algo)
+{
+	struct common_header *common_header;
+	scm_t_uint32 save_checksum, checksum;
+
+	common_header = (struct common_header *)sctp_packet;
+	save_checksum = ntohl(common_header->checksum);
+	common_header->checksum = htonl(0);
+	switch (checksum_algo) {
+	case CHECKSUM_CRC32C:
+		checksum = initialize_crc32c();
+		checksum = update_crc32c(checksum, packet, sctp_packet_length);
+		checksum = finalize_crc32c(checksum);
+		break;
+	case CHECKSUM_ADLER32:
+		checksum = initialize_adler32();
+		checksum = update_adler32(checksum, packet, sctp_packet_length);
+		checksum = finalize_adler32(checksum);
+		break;
+	case CHECKSUM_ZERO:
+		checksum = 0;
+		break;
+	}
+	common_header->checksum = ntohl(save_checksum);
+	return checksum == save_checksum ? SCM_BOOL_T : SCM_BOOL_F;
+}
+
+static SCM
+sctp_receive_v4(scm_t_uint16 checksum_algo)
 {
 	SCM s_source, s_destination, s_header, s_chunks, s_checksum_correct, s_udp_port;
 	scm_t_int32 ip_packet_length;
 	scm_t_uint16 sctp_packet_length, ip_header_length;
-	scm_t_uint32 save_checksum, checksum;
-
 	struct common_header *common_header;
 #ifdef LINUX
 	struct iphdr *ip_header;
@@ -470,20 +496,8 @@ sctp_receive_v4()
 	SCM_NEWSMOB(s_destination, address_tag, addr);
 
 	if (sctp_packet_length >= COMMON_HEADER_LENGTH) {
-		common_header = (struct common_header *)(packet + ip_header_length);
-		save_checksum = ntohl(common_header->checksum);
-		common_header->checksum = htonl(0);
-		checksum = initialize_crc32c();
-		checksum = update_crc32c(checksum, packet + ip_header_length, sctp_packet_length);
-		checksum = finalize_crc32c(checksum);
-		if (checksum == save_checksum) {
-			s_checksum_correct = SCM_BOOL_T;
-		} else {
-			s_checksum_correct = SCM_BOOL_F;
-		}
-		common_header->checksum = ntohl(save_checksum);
+		s_checksum_correct = sctp_checksum_correct(packet + ip_header_length, sctp_packet_length, checksum_algo);
 		common_header = (struct common_header *)scm_gc_malloc(COMMON_HEADER_LENGTH, "common_header");
-		memset((void *) common_header, 0, COMMON_HEADER_LENGTH);
 		memcpy((void *) common_header, (const void *) (packet + ip_header_length), COMMON_HEADER_LENGTH);
 		SCM_NEWSMOB(s_header, common_header_tag, common_header);
 		s_chunks = get_tlv_list(packet + ip_header_length + COMMON_HEADER_LENGTH, sctp_packet_length - COMMON_HEADER_LENGTH, "chunks", chunk_tag);
@@ -497,11 +511,10 @@ sctp_receive_v4()
 }
 
 static SCM 
-sctp_receive_v6()
+sctp_receive_v6(scm_t_uint16 checksum_algo)
 {
 	SCM s_source, s_destination, s_header, s_chunks, s_checksum_correct, s_udp_port;
 	scm_t_int32 sctp_packet_length;
-	scm_t_uint32 save_checksum, checksum;
 	struct msghdr msg;
 	struct cmsghdr *cmsg;
 	struct iovec iov[1];
@@ -548,20 +561,8 @@ sctp_receive_v6()
 	}
 
 	if (sctp_packet_length >= COMMON_HEADER_LENGTH) {
-		common_header = (struct common_header *)packet;
-		save_checksum = ntohl(common_header->checksum);
-		common_header->checksum = htonl(0);
-		checksum = initialize_crc32c();
-		checksum = update_crc32c(checksum, packet, sctp_packet_length);
-		checksum = finalize_crc32c(checksum);
-		if (checksum == save_checksum) {
-			s_checksum_correct = SCM_BOOL_T;
-		} else {
-			s_checksum_correct = SCM_BOOL_F;
-		}
-		common_header->checksum = ntohl(save_checksum);
+		s_checksum_correct = sctp_checksum_correct(packet, sctp_packet_length, checksum_algo);
 		common_header = (struct common_header *)scm_gc_malloc(COMMON_HEADER_LENGTH, "common_header");
-		memset((void *) common_header, 0, COMMON_HEADER_LENGTH);
 		memcpy((void *) common_header, (const void *)packet, COMMON_HEADER_LENGTH);
 		SCM_NEWSMOB(s_header, common_header_tag, common_header);
 		s_chunks = get_tlv_list(packet + COMMON_HEADER_LENGTH, sctp_packet_length - COMMON_HEADER_LENGTH, "chunks", chunk_tag);
@@ -575,11 +576,10 @@ sctp_receive_v6()
 }
 
 static SCM
-udp_receive_v4()
+udp_receive_v4(scm_t_uint16 checksum_algo)
 {
 	SCM s_source, s_destination, s_header, s_chunks, s_checksum_correct, s_udp_port;
 	scm_t_int32 sctp_packet_length;
-	scm_t_uint32 save_checksum, checksum;
 	struct msghdr msg;
 	struct cmsghdr *cmsg;
 	struct iovec iov[1];
@@ -625,20 +625,8 @@ udp_receive_v4()
 	}
 
 	if (sctp_packet_length >= COMMON_HEADER_LENGTH) {
-		common_header = (struct common_header *)packet;
-		save_checksum = ntohl(common_header->checksum);
-		common_header->checksum = htonl(0);
-		checksum = initialize_crc32c();
-		checksum = update_crc32c(checksum, packet, sctp_packet_length);
-		checksum = finalize_crc32c(checksum);
-		if (checksum == save_checksum) {
-			s_checksum_correct = SCM_BOOL_T;
-		} else {
-			s_checksum_correct = SCM_BOOL_F;
-		}
-		common_header->checksum = ntohl(save_checksum);
+		s_checksum_correct = sctp_checksum_correct(packet, sctp_packet_length, checksum_algo);
 		common_header = (struct common_header *)scm_gc_malloc(COMMON_HEADER_LENGTH, "common_header");
-		memset((void *) common_header, 0, COMMON_HEADER_LENGTH);
 		memcpy((void *) common_header, (const void *)packet, COMMON_HEADER_LENGTH);
 		SCM_NEWSMOB(s_header, common_header_tag, common_header);
 		s_chunks = get_tlv_list(packet + COMMON_HEADER_LENGTH, sctp_packet_length - COMMON_HEADER_LENGTH, "chunks", chunk_tag);
@@ -651,7 +639,7 @@ udp_receive_v4()
 }
 
 static SCM
-udp_receive_v6()
+udp_receive_v6(scm_t_uint16 checksum_algo)
 {
 	SCM s_source, s_destination, s_header, s_chunks, s_checksum_correct, s_udp_port;
 	scm_t_int32 sctp_packet_length;
@@ -703,20 +691,8 @@ udp_receive_v6()
 	}
 
 	if (sctp_packet_length >= COMMON_HEADER_LENGTH) {
-		common_header = (struct common_header *)packet;
-		save_checksum = ntohl(common_header->checksum);
-		common_header->checksum = htonl(0);
-		checksum = initialize_crc32c();
-		checksum = update_crc32c(checksum, packet, sctp_packet_length);
-		checksum = finalize_crc32c(checksum);
-		if (checksum == save_checksum) {
-			s_checksum_correct = SCM_BOOL_T;
-		} else {
-			s_checksum_correct = SCM_BOOL_F;
-		}
-		common_header->checksum = ntohl(save_checksum);
+		s_checksum_correct = sctp_checksum_correct(packet, sctp_packet_length, checksum_algo);
 		common_header = (struct common_header *)scm_gc_malloc(COMMON_HEADER_LENGTH, "common_header");
-		memset((void *) common_header, 0, COMMON_HEADER_LENGTH);
 		memcpy((void *) common_header, (const void *)packet, COMMON_HEADER_LENGTH);
 		SCM_NEWSMOB(s_header, common_header_tag, common_header);
 		s_chunks = get_tlv_list(packet + COMMON_HEADER_LENGTH, sctp_packet_length - COMMON_HEADER_LENGTH, "chunks", chunk_tag);
@@ -729,7 +705,7 @@ udp_receive_v6()
 }
 
 static SCM 
-sctp_receive(SCM s_ms)
+sctp_receive(SCM s_ms, scm_t_uint16 checksum_algo)
 {
 	scm_t_uint32 time_to_wait;
 	struct timeval timeval;
@@ -781,18 +757,36 @@ sctp_receive(SCM s_ms)
 		}
 	}
 	if (sctpv4_fd >= 0 && FD_ISSET(sctpv4_fd, &rset)) {
-		return sctp_receive_v4();
+		return sctp_receive_v4(checksum_algo);
 	}
 	if (sctpv6_fd >= 0 && FD_ISSET(sctpv6_fd, &rset)) {
-		return sctp_receive_v6();
+		return sctp_receive_v6(checksum_algo);
 	}
 	if (udpv4_fd >= 0 && FD_ISSET(udpv4_fd, &rset)) {
-		return udp_receive_v4();
+		return udp_receive_v4(checksum_algo);
 	}
 	if (udpv6_fd >= 0 && FD_ISSET(udpv6_fd, &rset)) {
-		return udp_receive_v6();
+		return udp_receive_v6(checksum_algo);
 	}
 	return scm_list_n(SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_BOOL_F, SCM_UNDEFINED);
+}
+
+static SCM
+sctp_receive_with_crc32c(SCM s_ms)
+{
+	return sctp_receive(s_ms, CHECKSUM_CRC32C);
+}
+
+static SCM
+sctp_receive_with_adler32(SCM s_ms)
+{
+	return sctp_receive(s_ms, CHECKSUM_ADLER32);
+}
+
+static SCM
+sctp_receive_with_zero(SCM s_ms)
+{
+	return sctp_receive(s_ms, CHECKSUM_ZERO);
 }
 
 static void
@@ -944,7 +938,9 @@ register_send_receive(void)
 	scm_c_define_gsubr("sctp-send-raw-with-adler32", 4, 1, 0, sctp_send_raw_with_adler32);
 	scm_c_define_gsubr("sctp-send-raw-with-zero",    4, 1, 0, sctp_send_raw_with_zero);
 	scm_c_define_gsubr("sctp-send-raw-with-wrong",   4, 1, 0, sctp_send_raw_with_wrong);
-	scm_c_define_gsubr("sctp-receive",               0, 1, 0, sctp_receive);
+	scm_c_define_gsubr("sctp-receive-with-crc32c",   0, 1, 0, sctp_receive_with_crc32c);
+	scm_c_define_gsubr("sctp-receive-with-adler32",  0, 1, 0, sctp_receive_with_adler32);
+	scm_c_define_gsubr("sctp-receive-with-zero",     0, 1, 0, sctp_receive_with_zero);
 	scm_c_define_gsubr("sctp-reset",                 0, 1, 0, sctp_reset);
 }
 

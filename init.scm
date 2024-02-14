@@ -128,6 +128,8 @@
 (define (sctp-send-raw common-header bytes to-address . rest)
   (apply sctp-send-raw-with-crc32c common-header bytes to-address (cons sctp-remote-udp-encaps-port rest)))
 
+(define sctp-receive sctp-receive-with-crc32c)
+
 (if (string=? (major-version) "1")
     (use-modules (ice-9 syncase)))
 
